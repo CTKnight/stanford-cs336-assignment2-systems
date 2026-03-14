@@ -5,11 +5,13 @@ import statistics
 import timeit
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import torch
 
 from cs336_basics.model.lm import TransformerLM
 from cs336_basics.model.loss import cross_entropy
+from cs336_basics.optimizer.adamw import AdamW
 
 
 VOCAB_SIZE = 10_000
@@ -38,6 +40,9 @@ class BenchmarkResult:
     mean_seconds: float
     std_seconds: float
     timings_seconds: list[float]
+    peak_memory_allocated_bytes: int | None = None
+    peak_memory_reserved_bytes: int | None = None
+    memory_snapshot_path: str | None = None
 
 
 MODEL_SIZES: dict[str, ModelConfig] = {
@@ -60,7 +65,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--vocab-size", type=int, default=VOCAB_SIZE)
     parser.add_argument("--rope-theta", type=float, default=ROPE_THETA)
-    parser.add_argument("--mode", choices=["forward", "forward-backward"], default="forward-backward")
+    parser.add_argument("--mode", choices=["forward", "forward-backward", "train-step"], default="forward-backward")
     parser.add_argument("--warmup-steps", type=int, default=5)
     parser.add_argument("--steps", type=int, default=10)
     parser.add_argument("--dtype", choices=["float32", "float16", "bfloat16"], default="float32")
@@ -69,6 +74,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--compile", action="store_true", help="Enable torch.compile for the model.")
     parser.add_argument("--compile-mode", default="default")
+    parser.add_argument("--memory-profile", action="store_true", help="Record a CUDA memory timeline and dump a snapshot.")
+    parser.add_argument(
+        "--memory-snapshot-path",
+        type=Path,
+        default=Path("memory_snapshot.pickle"),
+        help="Output path for the CUDA memory snapshot pickle.",
+    )
+    parser.add_argument("--memory-history-max-entries", type=int, default=1_000_000)
+    parser.add_argument("--learning-rate", type=float, default=1e-3)
+    parser.add_argument("--weight-decay", type=float, default=1e-2)
+    parser.add_argument("--beta1", type=float, default=0.9)
+    parser.add_argument("--beta2", type=float, default=0.999)
+    parser.add_argument("--eps", type=float, default=1e-8)
     return parser.parse_args()
 
 
@@ -187,15 +205,27 @@ def run_forward(model: torch.nn.Module, inputs: torch.Tensor, targets: torch.Ten
     return cross_entropy(logits.reshape(-1, vocab_size), targets.reshape(-1))
 
 
+def reset_memory_stats(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+
+
+def get_peak_memory_stats(device: torch.device) -> tuple[int | None, int | None]:
+    if device.type != "cuda":
+        return None, None
+    return torch.cuda.max_memory_allocated(device), torch.cuda.max_memory_reserved(device)
+
+
 def benchmark_step(
     model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer | None,
     inputs: torch.Tensor,
     targets: torch.Tensor,
     mode: str,
     device: torch.device,
     mixed_precision: str,
 ) -> float:
-    if mode == "forward-backward":
+    if mode in {"forward-backward", "train-step"}:
         model.zero_grad(set_to_none=True)
 
     synchronize(device)
@@ -208,6 +238,10 @@ def benchmark_step(
         with autocast_context(device, mixed_precision):
             loss = run_forward(model, inputs, targets)
         loss.backward()
+        if mode == "train-step":
+            if optimizer is None:
+                raise ValueError("optimizer is required for train-step benchmarks")
+            optimizer.step()
     synchronize(device)
     end = timeit.default_timer()
 
@@ -216,6 +250,7 @@ def benchmark_step(
 
 def benchmark(
     model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer | None,
     inputs: torch.Tensor,
     targets: torch.Tensor,
     mode: str,
@@ -223,8 +258,11 @@ def benchmark(
     steps: int,
     device: torch.device,
     mixed_precision: str,
-) -> list[float]:
-    model.train(mode == "forward-backward")
+    memory_profile: bool = False,
+    memory_history_max_entries: int = 1_000_000,
+    memory_snapshot_path: Path | None = None,
+) -> tuple[list[float], int | None, int | None]:
+    model.train(mode != "forward")
 
     if warmup_steps < 0:
         raise ValueError("--warmup-steps must be >= 0")
@@ -232,9 +270,21 @@ def benchmark(
         raise ValueError("--steps must be > 0")
 
     for _ in range(warmup_steps):
-        benchmark_step(model, inputs, targets, mode, device, mixed_precision)
+        benchmark_step(model, optimizer, inputs, targets, mode, device, mixed_precision)
 
-    return [benchmark_step(model, inputs, targets, mode, device, mixed_precision) for _ in range(steps)]
+    if memory_profile:
+        torch.cuda.memory._record_memory_history(max_entries=memory_history_max_entries)
+
+    try:
+        reset_memory_stats(device)
+        timings = [benchmark_step(model, optimizer, inputs, targets, mode, device, mixed_precision) for _ in range(steps)]
+        peak_allocated, peak_reserved = get_peak_memory_stats(device)
+        if memory_profile and memory_snapshot_path is not None:
+            torch.cuda.memory._dump_snapshot(str(memory_snapshot_path))
+        return timings, peak_allocated, peak_reserved
+    finally:
+        if memory_profile:
+            torch.cuda.memory._record_memory_history(enabled=None)
 
 
 def format_result(result: BenchmarkResult, model_config: ModelConfig) -> str:
@@ -252,10 +302,18 @@ def format_result(result: BenchmarkResult, model_config: ModelConfig) -> str:
         "steps": result.steps,
     }
     header = " ".join(f"{key}={value}" for key, value in details.items())
+    extra_metrics: list[str] = []
+    if result.peak_memory_allocated_bytes is not None:
+        extra_metrics.append(f"peak_memory_allocated_bytes={result.peak_memory_allocated_bytes}")
+    if result.peak_memory_reserved_bytes is not None:
+        extra_metrics.append(f"peak_memory_reserved_bytes={result.peak_memory_reserved_bytes}")
+    if result.memory_snapshot_path is not None:
+        extra_metrics.append(f"memory_snapshot_path={result.memory_snapshot_path}")
     return (
         f"{header}\n"
         f"mean_ms={result.mean_seconds * 1000.0:.3f} "
         f"std_ms={result.std_seconds * 1000.0:.3f} "
+        f"{' '.join(extra_metrics)} "
         f"timings_ms={[round(timing, 3) for timing in timings_ms]}"
     )
 
@@ -282,6 +340,8 @@ def main() -> None:
         raise ValueError("This CUDA device does not report BF16 support.")
     if args.mixed_precision != "none" and args.dtype != "float32":
         raise ValueError("Mixed precision benchmark expects FP32 model parameters; use --dtype float32.")
+    if args.memory_profile and device.type != "cuda":
+        raise ValueError("--memory-profile requires CUDA.")
 
     if device.type == "cuda":
         torch.backends.cuda.matmul.allow_tf32 = True
@@ -298,14 +358,28 @@ def main() -> None:
         compile_model=args.compile,
         compile_mode=args.compile_mode,
     )
+    optimizer = None
+    if args.mode == "train-step":
+        optimizer = AdamW(
+            model.parameters(),
+            lr=args.learning_rate,
+            weight_decay=args.weight_decay,
+            betas=(args.beta1, args.beta2),
+            eps=args.eps,
+        )
     inputs, targets = make_random_batch(
         batch_size=args.batch_size,
         context_length=args.context_length,
         vocab_size=args.vocab_size,
         device=device,
     )
-    timings = benchmark(
+    snapshot_path: str | None = None
+    if args.memory_profile:
+        args.memory_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        snapshot_path = str(args.memory_snapshot_path)
+    timings, peak_memory_allocated_bytes, peak_memory_reserved_bytes = benchmark(
         model=model,
+        optimizer=optimizer,
         inputs=inputs,
         targets=targets,
         mode=args.mode,
@@ -313,6 +387,9 @@ def main() -> None:
         steps=args.steps,
         device=device,
         mixed_precision=args.mixed_precision,
+        memory_profile=args.memory_profile,
+        memory_history_max_entries=args.memory_history_max_entries,
+        memory_snapshot_path=args.memory_snapshot_path if args.memory_profile else None,
     )
     result = BenchmarkResult(
         mode=args.mode,
@@ -327,6 +404,9 @@ def main() -> None:
         mean_seconds=statistics.mean(timings),
         std_seconds=statistics.stdev(timings) if len(timings) > 1 else 0.0,
         timings_seconds=timings,
+        peak_memory_allocated_bytes=peak_memory_allocated_bytes,
+        peak_memory_reserved_bytes=peak_memory_reserved_bytes,
+        memory_snapshot_path=snapshot_path,
     )
     print(format_result(result, model_config))
 
