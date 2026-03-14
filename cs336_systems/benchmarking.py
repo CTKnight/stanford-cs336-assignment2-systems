@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import statistics
 import timeit
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 
 import torch
@@ -29,6 +30,7 @@ class BenchmarkResult:
     model_size: str
     device: str
     dtype: str
+    mixed_precision: str
     batch_size: int
     context_length: int
     warmup_steps: int
@@ -62,6 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup-steps", type=int, default=5)
     parser.add_argument("--steps", type=int, default=10)
     parser.add_argument("--dtype", choices=["float32", "float16", "bfloat16"], default="float32")
+    parser.add_argument("--mixed-precision", choices=["none", "bfloat16"], default="none")
     parser.add_argument("--device", default=None, help="Defaults to cuda, then mps, then cpu.")
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--compile", action="store_true", help="Enable torch.compile for the model.")
@@ -85,6 +88,14 @@ def resolve_dtype(dtype_name: str) -> torch.dtype:
         "float16": torch.float16,
         "bfloat16": torch.bfloat16,
     }[dtype_name]
+
+
+def autocast_context(device: torch.device, mixed_precision: str):
+    if mixed_precision == "none":
+        return nullcontext()
+    if device.type != "cuda":
+        raise ValueError("Mixed precision autocast in this benchmark expects CUDA.")
+    return torch.autocast(device_type="cuda", dtype=resolve_dtype(mixed_precision))
 
 
 def synchronize(device: torch.device) -> None:
@@ -182,6 +193,7 @@ def benchmark_step(
     targets: torch.Tensor,
     mode: str,
     device: torch.device,
+    mixed_precision: str,
 ) -> float:
     if mode == "forward-backward":
         model.zero_grad(set_to_none=True)
@@ -190,9 +202,11 @@ def benchmark_step(
     start = timeit.default_timer()
     if mode == "forward":
         with torch.no_grad():
-            _ = run_forward(model, inputs, targets)
+            with autocast_context(device, mixed_precision):
+                _ = run_forward(model, inputs, targets)
     else:
-        loss = run_forward(model, inputs, targets)
+        with autocast_context(device, mixed_precision):
+            loss = run_forward(model, inputs, targets)
         loss.backward()
     synchronize(device)
     end = timeit.default_timer()
@@ -208,6 +222,7 @@ def benchmark(
     warmup_steps: int,
     steps: int,
     device: torch.device,
+    mixed_precision: str,
 ) -> list[float]:
     model.train(mode == "forward-backward")
 
@@ -217,9 +232,9 @@ def benchmark(
         raise ValueError("--steps must be > 0")
 
     for _ in range(warmup_steps):
-        benchmark_step(model, inputs, targets, mode, device)
+        benchmark_step(model, inputs, targets, mode, device, mixed_precision)
 
-    return [benchmark_step(model, inputs, targets, mode, device) for _ in range(steps)]
+    return [benchmark_step(model, inputs, targets, mode, device, mixed_precision) for _ in range(steps)]
 
 
 def format_result(result: BenchmarkResult, model_config: ModelConfig) -> str:
@@ -230,6 +245,7 @@ def format_result(result: BenchmarkResult, model_config: ModelConfig) -> str:
         **asdict(model_config),
         "device": result.device,
         "dtype": result.dtype,
+        "mixed_precision": result.mixed_precision,
         "batch_size": result.batch_size,
         "context_length": result.context_length,
         "warmup_steps": result.warmup_steps,
@@ -260,6 +276,12 @@ def main() -> None:
 
     if args.dtype == "bfloat16" and device.type == "mps":
         raise ValueError("bfloat16 benchmarking on MPS is not supported by this script.")
+    if args.mixed_precision == "bfloat16" and device.type != "cuda":
+        raise ValueError("--mixed-precision bfloat16 requires CUDA.")
+    if args.mixed_precision == "bfloat16" and device.type == "cuda" and not torch.cuda.is_bf16_supported():
+        raise ValueError("This CUDA device does not report BF16 support.")
+    if args.mixed_precision != "none" and args.dtype != "float32":
+        raise ValueError("Mixed precision benchmark expects FP32 model parameters; use --dtype float32.")
 
     if device.type == "cuda":
         torch.backends.cuda.matmul.allow_tf32 = True
@@ -290,12 +312,14 @@ def main() -> None:
         warmup_steps=args.warmup_steps,
         steps=args.steps,
         device=device,
+        mixed_precision=args.mixed_precision,
     )
     result = BenchmarkResult(
         mode=args.mode,
         model_size=model_size_name,
         device=str(device),
         dtype=args.dtype,
+        mixed_precision=args.mixed_precision,
         batch_size=args.batch_size,
         context_length=args.context_length,
         warmup_steps=args.warmup_steps,

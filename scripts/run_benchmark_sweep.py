@@ -18,6 +18,7 @@ class BenchmarkSummary:
     mode: str
     model_size: str
     warmup_steps: int
+    mixed_precision: str
     mean_ms: float
     std_ms: float
     timings_ms: list[float]
@@ -28,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run repeated benchmark sweeps via cs336_systems.benchmarking.")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--dtype", default="float16", choices=["float32", "float16", "bfloat16"])
+    parser.add_argument("--mixed-precision", default="none", choices=["none", "bfloat16"])
     parser.add_argument("--context-length", type=int, default=256)
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--steps", type=int, default=10)
@@ -61,6 +63,8 @@ def run_one(
         args.device,
         "--dtype",
         args.dtype,
+        "--mixed-precision",
+        args.mixed_precision,
         "--context-length",
         str(args.context_length),
         "--batch-size",
@@ -84,6 +88,7 @@ def run_one(
         mode=header["mode"],
         model_size=header["model_size"],
         warmup_steps=int(header["warmup_steps"]),
+        mixed_precision=header["mixed_precision"],
         mean_ms=float(metrics["mean_ms"]),
         std_ms=float(metrics["std_ms"]),
         timings_ms=timings_ms,
@@ -106,6 +111,7 @@ def main() -> None:
                         "mode": summary.mode,
                         "model_size": summary.model_size,
                         "warmup_steps": summary.warmup_steps,
+                        "mixed_precision": summary.mixed_precision,
                         "mean_ms": summary.mean_ms,
                         "std_ms": summary.std_ms,
                         "timings_ms": summary.timings_ms,
@@ -119,6 +125,7 @@ def main() -> None:
                         "mode": mode,
                         "model_size": model_size,
                         "warmup_steps": warmup_steps,
+                        "mixed_precision": args.mixed_precision,
                         "returncode": exc.returncode,
                         "stderr": exc.stderr.strip(),
                         "stdout": exc.stdout.strip(),
