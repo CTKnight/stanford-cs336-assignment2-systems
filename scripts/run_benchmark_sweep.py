@@ -18,6 +18,9 @@ class BenchmarkSummary:
     mode: str
     model_size: str
     warmup_steps: int
+    compile: bool
+    compile_mode: str
+    compile_backend: str
     mixed_precision: str
     mean_ms: float
     std_ms: float
@@ -37,6 +40,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-sizes", nargs="+", default=MODEL_SIZES, choices=MODEL_SIZES)
     parser.add_argument("--modes", nargs="+", default=["forward", "forward-backward"], choices=["forward", "forward-backward"])
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--compile", action="store_true")
+    parser.add_argument("--compile-mode", default="default")
+    parser.add_argument("--compile-backend", default="inductor")
     parser.add_argument("--stop-on-error", action="store_true")
     return parser.parse_args()
 
@@ -70,6 +76,8 @@ def run_one(
         "--batch-size",
         str(args.batch_size),
     ]
+    if args.compile:
+        cmd.extend(["--compile", "--compile-mode", args.compile_mode, "--compile-backend", args.compile_backend])
     completed = subprocess.run(cmd, capture_output=True, text=True, check=True)
     raw = completed.stdout.strip()
     lines = [line.strip() for line in raw.splitlines() if line.strip()]
@@ -88,6 +96,9 @@ def run_one(
         mode=header["mode"],
         model_size=header["model_size"],
         warmup_steps=int(header["warmup_steps"]),
+        compile=header["compile"] == "True",
+        compile_mode=header["compile_mode"],
+        compile_backend=header["compile_backend"],
         mixed_precision=header["mixed_precision"],
         mean_ms=float(metrics["mean_ms"]),
         std_ms=float(metrics["std_ms"]),
@@ -111,6 +122,9 @@ def main() -> None:
                         "mode": summary.mode,
                         "model_size": summary.model_size,
                         "warmup_steps": summary.warmup_steps,
+                        "compile": summary.compile,
+                        "compile_mode": summary.compile_mode,
+                        "compile_backend": summary.compile_backend,
                         "mixed_precision": summary.mixed_precision,
                         "mean_ms": summary.mean_ms,
                         "std_ms": summary.std_ms,
@@ -125,6 +139,9 @@ def main() -> None:
                         "mode": mode,
                         "model_size": model_size,
                         "warmup_steps": warmup_steps,
+                        "compile": args.compile,
+                        "compile_mode": args.compile_mode,
+                        "compile_backend": args.compile_backend,
                         "mixed_precision": args.mixed_precision,
                         "returncode": exc.returncode,
                         "stderr": exc.stderr.strip(),

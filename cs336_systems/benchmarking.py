@@ -32,6 +32,9 @@ class BenchmarkResult:
     model_size: str
     device: str
     dtype: str
+    compile: bool
+    compile_mode: str
+    compile_backend: str
     mixed_precision: str
     batch_size: int
     context_length: int
@@ -74,6 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--compile", action="store_true", help="Enable torch.compile for the model.")
     parser.add_argument("--compile-mode", default="default")
+    parser.add_argument("--compile-backend", default="inductor")
     parser.add_argument("--memory-profile", action="store_true", help="Record a CUDA memory timeline and dump a snapshot.")
     parser.add_argument(
         "--memory-snapshot-path",
@@ -138,6 +142,7 @@ def build_model(
     dtype: torch.dtype,
     compile_model: bool,
     compile_mode: str,
+    compile_backend: str,
 ) -> torch.nn.Module:
     model = TransformerLM(
         vocab_size=vocab_size,
@@ -151,7 +156,7 @@ def build_model(
         dtype=dtype,
     )
     if compile_model and hasattr(torch, "compile") and device.type != "mps":
-        model = torch.compile(model, mode=compile_mode)
+        model = torch.compile(model, mode=compile_mode, backend=compile_backend)
     return model
 
 
@@ -283,6 +288,9 @@ def format_result(result: BenchmarkResult, model_config: ModelConfig) -> str:
         **asdict(model_config),
         "device": result.device,
         "dtype": result.dtype,
+        "compile": result.compile,
+        "compile_mode": result.compile_mode,
+        "compile_backend": result.compile_backend,
         "mixed_precision": result.mixed_precision,
         "batch_size": result.batch_size,
         "context_length": result.context_length,
@@ -352,6 +360,7 @@ def main() -> None:
             dtype=dtype,
             compile_model=args.compile,
             compile_mode=args.compile_mode,
+            compile_backend=args.compile_backend,
         )
         optimizer = None
         if args.mode == "train-step":
@@ -393,6 +402,9 @@ def main() -> None:
         model_size=model_size_name,
         device=str(device),
         dtype=args.dtype,
+        compile=args.compile,
+        compile_mode=args.compile_mode,
+        compile_backend=args.compile_backend,
         mixed_precision=args.mixed_precision,
         batch_size=args.batch_size,
         context_length=args.context_length,
