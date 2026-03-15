@@ -258,9 +258,6 @@ def benchmark(
     steps: int,
     device: torch.device,
     mixed_precision: str,
-    memory_profile: bool = False,
-    memory_history_max_entries: int = 1_000_000,
-    memory_snapshot_path: Path | None = None,
 ) -> tuple[list[float], int | None, int | None]:
     model.train(mode != "forward")
 
@@ -272,19 +269,10 @@ def benchmark(
     for _ in range(warmup_steps):
         benchmark_step(model, optimizer, inputs, targets, mode, device, mixed_precision)
 
-    if memory_profile:
-        torch.cuda.memory._record_memory_history(max_entries=memory_history_max_entries)
-
-    try:
-        reset_memory_stats(device)
-        timings = [benchmark_step(model, optimizer, inputs, targets, mode, device, mixed_precision) for _ in range(steps)]
-        peak_allocated, peak_reserved = get_peak_memory_stats(device)
-        if memory_profile and memory_snapshot_path is not None:
-            torch.cuda.memory._dump_snapshot(str(memory_snapshot_path))
-        return timings, peak_allocated, peak_reserved
-    finally:
-        if memory_profile:
-            torch.cuda.memory._record_memory_history(enabled=None)
+    reset_memory_stats(device)
+    timings = [benchmark_step(model, optimizer, inputs, targets, mode, device, mixed_precision) for _ in range(steps)]
+    peak_allocated, peak_reserved = get_peak_memory_stats(device)
+    return timings, peak_allocated, peak_reserved
 
 
 def format_result(result: BenchmarkResult, model_config: ModelConfig) -> str:
@@ -348,49 +336,58 @@ def main() -> None:
         torch.backends.cudnn.allow_tf32 = True
         torch.set_float32_matmul_precision("high")
 
-    model = build_model(
-        config=model_config,
-        vocab_size=args.vocab_size,
-        context_length=args.context_length,
-        rope_theta=args.rope_theta,
-        device=device,
-        dtype=dtype,
-        compile_model=args.compile,
-        compile_mode=args.compile_mode,
-    )
-    optimizer = None
-    if args.mode == "train-step":
-        optimizer = AdamW(
-            model.parameters(),
-            lr=args.learning_rate,
-            weight_decay=args.weight_decay,
-            betas=(args.beta1, args.beta2),
-            eps=args.eps,
-        )
-    inputs, targets = make_random_batch(
-        batch_size=args.batch_size,
-        context_length=args.context_length,
-        vocab_size=args.vocab_size,
-        device=device,
-    )
-    snapshot_path: str | None = None
+    memory_history_started = False
     if args.memory_profile:
         args.memory_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-        snapshot_path = str(args.memory_snapshot_path)
-    timings, peak_memory_allocated_bytes, peak_memory_reserved_bytes = benchmark(
-        model=model,
-        optimizer=optimizer,
-        inputs=inputs,
-        targets=targets,
-        mode=args.mode,
-        warmup_steps=args.warmup_steps,
-        steps=args.steps,
-        device=device,
-        mixed_precision=args.mixed_precision,
-        memory_profile=args.memory_profile,
-        memory_history_max_entries=args.memory_history_max_entries,
-        memory_snapshot_path=args.memory_snapshot_path if args.memory_profile else None,
-    )
+        torch.cuda.memory._record_memory_history(max_entries=args.memory_history_max_entries)
+        memory_history_started = True
+
+    try:
+        model = build_model(
+            config=model_config,
+            vocab_size=args.vocab_size,
+            context_length=args.context_length,
+            rope_theta=args.rope_theta,
+            device=device,
+            dtype=dtype,
+            compile_model=args.compile,
+            compile_mode=args.compile_mode,
+        )
+        optimizer = None
+        if args.mode == "train-step":
+            optimizer = AdamW(
+                model.parameters(),
+                lr=args.learning_rate,
+                weight_decay=args.weight_decay,
+                betas=(args.beta1, args.beta2),
+                eps=args.eps,
+            )
+        inputs, targets = make_random_batch(
+            batch_size=args.batch_size,
+            context_length=args.context_length,
+            vocab_size=args.vocab_size,
+            device=device,
+        )
+        snapshot_path: str | None = None
+        if args.memory_profile:
+            args.memory_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            snapshot_path = str(args.memory_snapshot_path)
+        timings, peak_memory_allocated_bytes, peak_memory_reserved_bytes = benchmark(
+            model=model,
+            optimizer=optimizer,
+            inputs=inputs,
+            targets=targets,
+            mode=args.mode,
+            warmup_steps=args.warmup_steps,
+            steps=args.steps,
+            device=device,
+            mixed_precision=args.mixed_precision,
+        )
+        if args.memory_profile:
+            torch.cuda.memory._dump_snapshot(str(args.memory_snapshot_path))
+    finally:
+        if memory_history_started:
+            torch.cuda.memory._record_memory_history(enabled=None)
     result = BenchmarkResult(
         mode=args.mode,
         model_size=model_size_name,

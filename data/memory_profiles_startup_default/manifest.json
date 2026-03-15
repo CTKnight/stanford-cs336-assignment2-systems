@@ -1,0 +1,101 @@
+[
+  {
+    "status": "ok",
+    "mode": "forward",
+    "model_size": "2.7B",
+    "device": "cuda",
+    "dtype": "float32",
+    "mixed_precision": "none",
+    "batch_size": 4,
+    "context_length": 128,
+    "warmup_steps": 2,
+    "steps": 1,
+    "mean_ms": 89.497,
+    "std_ms": 0.0,
+    "timings_ms": [
+      89.497
+    ],
+    "peak_memory_allocated_bytes": 13809024512,
+    "peak_memory_reserved_bytes": 13864271872,
+    "memory_snapshot_path": "data/memory_profiles_startup_default/2p7B_ctx128_forward_float32.pickle",
+    "stdout": "mode=forward model_size=2.7B d_model=2560 d_ff=10240 num_layers=32 num_heads=32 device=cuda dtype=float32 mixed_precision=none batch_size=4 context_length=128 warmup_steps=2 steps=1\nmean_ms=89.497 std_ms=0.000 peak_memory_allocated_bytes=13809024512 peak_memory_reserved_bytes=13864271872 memory_snapshot_path=data/memory_profiles_startup_default/2p7B_ctx128_forward_float32.pickle timings_ms=[89.497]"
+  },
+  {
+    "status": "error",
+    "model_size": "2.7B",
+    "context_length": 128,
+    "profile_mode": "train-step",
+    "dtype": "float32",
+    "mixed_precision": "none",
+    "memory_snapshot_path": "data/memory_profiles_startup_default/2p7B_ctx128_train-step_float32.pickle",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "[W314 17:07:49.400185857 unwind.cpp:218] Warning: Unsupported unwinding pattern: unknown op code 0x8 (function unwinderFor)\nTraceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 412, in <module>\n    main()\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 375, in main\n    timings, peak_memory_allocated_bytes, peak_memory_reserved_bytes = benchmark(\n                                                                       ^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 270, in benchmark\n    benchmark_step(model, optimizer, inputs, targets, mode, device, mixed_precision)\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 244, in benchmark_step\n    optimizer.step()\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py\", line 493, in wrapper\n    out = func(*args, **kwargs)\n          ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/utils/_contextlib.py\", line 116, in decorate_context\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment1-basics/cs336_basics/optimizer/adamw.py\", line 61, in step\n    state[\"v\"] = torch.zeros_like(p)\n                 ^^^^^^^^^^^^^^^^^^^\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 100.00 MiB. GPU 0 has a total capacity of 23.99 GiB of which 0 bytes is free. Including non-PyTorch memory, this process has 17179869184.00 GiB memory in use. Of the allocated memory 37.74 GiB is allocated by PyTorch, and 160.31 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  },
+  {
+    "status": "ok",
+    "mode": "forward",
+    "model_size": "2.7B",
+    "device": "cuda",
+    "dtype": "float32",
+    "mixed_precision": "none",
+    "batch_size": 4,
+    "context_length": 256,
+    "warmup_steps": 2,
+    "steps": 1,
+    "mean_ms": 135.983,
+    "std_ms": 0.0,
+    "timings_ms": [
+      135.983
+    ],
+    "peak_memory_allocated_bytes": 13947222016,
+    "peak_memory_reserved_bytes": 14180941824,
+    "memory_snapshot_path": "data/memory_profiles_startup_default/2p7B_ctx256_forward_float32.pickle",
+    "stdout": "mode=forward model_size=2.7B d_model=2560 d_ff=10240 num_layers=32 num_heads=32 device=cuda dtype=float32 mixed_precision=none batch_size=4 context_length=256 warmup_steps=2 steps=1\nmean_ms=135.983 std_ms=0.000 peak_memory_allocated_bytes=13947222016 peak_memory_reserved_bytes=14180941824 memory_snapshot_path=data/memory_profiles_startup_default/2p7B_ctx256_forward_float32.pickle timings_ms=[135.983]"
+  },
+  {
+    "status": "error",
+    "model_size": "2.7B",
+    "context_length": 256,
+    "profile_mode": "train-step",
+    "dtype": "float32",
+    "mixed_precision": "none",
+    "memory_snapshot_path": "data/memory_profiles_startup_default/2p7B_ctx256_train-step_float32.pickle",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "[W314 17:08:46.787842432 unwind.cpp:218] Warning: Unsupported unwinding pattern: unknown op code 0x8 (function unwinderFor)\nTraceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 412, in <module>\n    main()\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 375, in main\n    timings, peak_memory_allocated_bytes, peak_memory_reserved_bytes = benchmark(\n                                                                       ^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 270, in benchmark\n    benchmark_step(model, optimizer, inputs, targets, mode, device, mixed_precision)\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 244, in benchmark_step\n    optimizer.step()\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py\", line 493, in wrapper\n    out = func(*args, **kwargs)\n          ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/utils/_contextlib.py\", line 116, in decorate_context\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment1-basics/cs336_basics/optimizer/adamw.py\", line 70, in step\n    p.addcdiv_(m, v.sqrt().add(eps), value=-lr_t)\n                  ^^^^^^^^^^^^^^^^^\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 100.00 MiB. GPU 0 has a total capacity of 23.99 GiB of which 0 bytes is free. Including non-PyTorch memory, this process has 17179869184.00 GiB memory in use. Of the allocated memory 37.52 GiB is allocated by PyTorch, and 392.14 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  },
+  {
+    "status": "ok",
+    "mode": "forward",
+    "model_size": "2.7B",
+    "device": "cuda",
+    "dtype": "float32",
+    "mixed_precision": "none",
+    "batch_size": 4,
+    "context_length": 512,
+    "warmup_steps": 2,
+    "steps": 1,
+    "mean_ms": 316.413,
+    "std_ms": 0.0,
+    "timings_ms": [
+      316.413
+    ],
+    "peak_memory_allocated_bytes": 14530594816,
+    "peak_memory_reserved_bytes": 14575206400,
+    "memory_snapshot_path": "data/memory_profiles_startup_default/2p7B_ctx512_forward_float32.pickle",
+    "stdout": "mode=forward model_size=2.7B d_model=2560 d_ff=10240 num_layers=32 num_heads=32 device=cuda dtype=float32 mixed_precision=none batch_size=4 context_length=512 warmup_steps=2 steps=1\nmean_ms=316.413 std_ms=0.000 peak_memory_allocated_bytes=14530594816 peak_memory_reserved_bytes=14575206400 memory_snapshot_path=data/memory_profiles_startup_default/2p7B_ctx512_forward_float32.pickle timings_ms=[316.413]"
+  },
+  {
+    "status": "error",
+    "model_size": "2.7B",
+    "context_length": 512,
+    "profile_mode": "train-step",
+    "dtype": "float32",
+    "mixed_precision": "none",
+    "memory_snapshot_path": "data/memory_profiles_startup_default/2p7B_ctx512_train-step_float32.pickle",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "Traceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 412, in <module>\n    main()\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 375, in main\n    timings, peak_memory_allocated_bytes, peak_memory_reserved_bytes = benchmark(\n                                                                       ^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 270, in benchmark\n    benchmark_step(model, optimizer, inputs, targets, mode, device, mixed_precision)\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 239, in benchmark_step\n    loss = run_forward(model, inputs, targets)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/cs336_systems/benchmarking.py\", line 203, in run_forward\n    logits = model(inputs)\n             ^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1739, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1750, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment1-basics/cs336_basics/model/lm.py\", line 53, in forward\n    hidden = transformer(hidden, token_positions=token_positions)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1739, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1750, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment1-basics/cs336_basics/model/transformer.py\", line 37, in forward\n    result = result + self.mh_attention(self.pre_attention_norm(result), token_positions)\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1739, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1750, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment1-basics/cs336_basics/model/attention.py\", line 60, in forward\n    q_roped = self.rope(q, token_positions)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1739, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment2-systems/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1750, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/alanljw/projects/assignment1-basics/cs336_basics/model/rope.py\", line 48, in forward\n    if token_positions.shape[-1] == seq_len and torch.equal(\n                                                ^^^^^^^^^^^^\nRuntimeError: CUDA error: out of memory\nCUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.\nFor debugging consider passing CUDA_LAUNCH_BLOCKING=1\nCompile with `TORCH_USE_CUDA_DSA` to enable device-side assertions."
+  }
+]
