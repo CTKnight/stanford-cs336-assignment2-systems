@@ -72,14 +72,7 @@ class FlashAttentionPytorch(autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_out: Tensor) -> tuple[Tensor, Tensor, Tensor, None]:
-        q, k, v, _lse = ctx.saved_tensors
-        with torch.enable_grad():
-            q_ref = q.detach().requires_grad_(True)
-            k_ref = k.detach().requires_grad_(True)
-            v_ref = v.detach().requires_grad_(True)
-            o_ref, _ = FlashAttentionPytorch.flash_attention_forward(q_ref, k_ref, v_ref, is_causal=ctx.is_causal)
-            dq, dk, dv = torch.autograd.grad(o_ref, (q_ref, k_ref, v_ref), grad_out)
-        return dq, dk, dv, None
+        raise NotImplementedError()
 
 
 class FlashAttentionTriton(autograd.Function):
@@ -160,14 +153,7 @@ class FlashAttentionTriton(autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_out: Tensor) -> tuple[Tensor, Tensor, Tensor, None]:
-        q, k, v, _lse = ctx.saved_tensors
-        with torch.enable_grad():
-            q_ref = q.detach().requires_grad_(True)
-            k_ref = k.detach().requires_grad_(True)
-            v_ref = v.detach().requires_grad_(True)
-            o_ref, _ = FlashAttentionPytorch.flash_attention_forward(q_ref, k_ref, v_ref, is_causal=ctx.is_causal)
-            dq, dk, dv = torch.autograd.grad(o_ref, (q_ref, k_ref, v_ref), grad_out)
-        return dq, dk, dv, None
+        raise NotImplementedError()
 
 @triton.jit
 def flash_attention_kernel(
